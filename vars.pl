@@ -3,13 +3,15 @@ use warnings;
 
 BEGIN {
     use Storable;
-    our (%foo, $firsterr, $seconderr, $farg, $sarg);
+    our (%foo, $firsterr, $seconderr, $farg, $sarg, @varcmds);
     my $hashref;
     if(-e '.vardata') {
         (($hashref = retrieve('.vardata')) && (%foo = %{$hashref}));
     }
 }
-our (%foo, $firsterr, $seconderr, $farg, $sarg);
+our (%foo, $firsterr, $seconderr, $farg, $sarg, @varcmds);
+
+@varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp');
 
 sub cmd_mkvar {
     my ($data) = @_;
@@ -65,6 +67,10 @@ sub cmd_rmvar {
 sub varreplace {
     return if not %foo;
     my ($data, $server, $witem) = @_;
+    if($data =~ /^\/(.*?)\s/ && grep($1, @varcmds)) {
+        Irssi::print("$1 is a varcmd");
+        return;
+    }
     if (!$server || !$server->{connected}) {
         Irssi::print("Not connected to server");
         return;
@@ -146,3 +152,4 @@ Irssi::command_bind('rmvar', 'cmd_rmvar');
 Irssi::command_bind('varhelp', 'help');
 Irssi::command_bind('varlist', 'listvars');
 Irssi::signal_add('send text', 'varreplace');
+Irssi::signal_add('send command', 'varreplace');
