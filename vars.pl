@@ -61,7 +61,8 @@ sub cmd_mkvar {
 sub cmd_rmvar {
     my ($data) = @_;
     if(delete $foo{$data} && store(\%foo, '.vardata')) {
-        Irssi::print("variable '$data' has been successfully deleted")
+        Irssi::print("variable '$data' has been successfully deleted");
+    }
     else {
         Irssi::print("variable '$data' not found");
     }
