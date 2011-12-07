@@ -60,16 +60,24 @@ sub cmd_mkvar {
 
 sub cmd_rmvar {
     my ($data) = @_;
-    (delete $foo{$data} && store(\%foo, '.vardata') && Irssi::print("variable '$data' has been successfully deleted")) || Irssi::print("variable '$data' not found");
+    if(delete $foo{$data} && store(\%foo, '.vardata')) {
+        Irssi::print("variable '$data' has been successfully deleted")
+    else {
+        Irssi::print("variable '$data' not found");
+    }
     return;
 }
 
 sub varreplace {
     return if not %foo;
     my ($data, $server, $witem) = @_;
-    if($data =~ /^\/(.*?)\s/ && grep(/$1/, @varcmds)) {
-        Irssi::print("$1 is a varcmd");
-        return;
+    if($data =~ /^\/(.*?)\s/) {
+        my @matches = grep {$1} @varcmds;
+        Irssi::print(join(', ', @matches));
+        if(@matches) {
+            Irssi::print("$1 is a varcmd");
+            return;
+        }
     }
     if (!$server || !$server->{connected}) {
         Irssi::print("Not connected to server");
