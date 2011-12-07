@@ -72,6 +72,9 @@ sub cmd_rmvar {
 sub varreplace {
     return if not %foo;
     my ($data, $server, $witem) = @_;
+    my $emit = Irssi::signal_get_emitted();
+    Irssi::print($emit);
+    Irssi::print("data in varreplace sub: $data");
     if($data =~ /^\/(.*?)\s/) {
         my @matches = grep(/$1/, @varcmds);
         Irssi::print(join(', ', @matches));
@@ -85,7 +88,9 @@ sub varreplace {
         return;
     }
     if ($data) {
+        Irssi::print("about to init loopcheck");
         $data = loopcheck($data);
+        Irssi::print("loopcheck fin - data = $data");
         if($data ne 'ERROR') {
             $data =~ s/\\\{\{/{{/g;
             $data =~ s/\\\}\}/}}/g;
@@ -100,10 +105,12 @@ sub varreplace {
 
 sub loopcheck {
     my ($data) = @_;
+    Irssi::print("data: $data");
     my @loop;
     while($data =~ /(?!\\)\{\{(?=\w)([\w\s]+?)(?<=\w)\}\}/) {
+        Irssi::print("why am I here? - pre: $`; match: $&; post: $'");
         my $var = $1;
-        if(! grep(/^$var$/, @loop)) {
+        if(!grep(/^$var$/, @loop)) {
             push(@loop, $var);
             $data =~ s/\{\{$var\}\}/$foo{$var}/e;
         }
@@ -112,6 +119,7 @@ sub loopcheck {
             return 'ERROR';
         }
     }
+        Irssi::print("After loop: data = $data");
 	return $data;
 }
 
@@ -160,5 +168,5 @@ Irssi::command_bind('mkvar', 'cmd_mkvar');
 Irssi::command_bind('rmvar', 'cmd_rmvar');
 Irssi::command_bind('varhelp', 'help');
 Irssi::command_bind('varlist', 'listvars');
-Irssi::signal_add('send text', 'varreplace');
+#Irssi::signal_add('send text', 'varreplace');
 Irssi::signal_add('send command', 'varreplace');
