@@ -73,7 +73,7 @@ sub varreplace {
     return if not %foo;
     my ($data, $server, $witem) = @_;
     if($data =~ /^\/(.*?)\s/) {
-        my @matches = grep {$1} @varcmds;
+        my @matches = grep(/$1/, @varcmds);
         Irssi::print(join(', ', @matches));
         if(@matches) {
             Irssi::print("$1 is a varcmd");
