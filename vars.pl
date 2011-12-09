@@ -72,14 +72,14 @@ sub cmd_rmvar {
 sub varreplace {
     return if not %foo;
     my ($data, $server, $witem) = @_;
-    my $emit = Irssi::signal_get_emitted();
-    Irssi::print($emit);
-    Irssi::print("data in varreplace sub: $data");
+    #my $emit = Irssi::signal_get_emitted();
+    #Irssi::print($emit);
+    #Irssi::print("data in varreplace sub: $data");
     if($data =~ /^\/(.*?)\s/) {
         my @matches = grep(/$1/, @varcmds);
-        Irssi::print(join(', ', @matches));
+        #Irssi::print(join(', ', @matches));
         if(@matches) {
-            Irssi::print("$1 is a varcmd");
+            #Irssi::print("$1 is a varcmd");
             return;
         }
     }
@@ -88,9 +88,9 @@ sub varreplace {
         return;
     }
     if ($data) {
-        Irssi::print("about to init loopcheck");
+        #Irssi::print("about to init loopcheck");
         $data = loopcheck($data);
-        Irssi::print("loopcheck fin - data = $data");
+        #Irssi::print("loopcheck fin - data = $data");
         if($data ne 'ERROR') {
             $data =~ s/\\\{\{/{{/g;
             $data =~ s/\\\}\}/}}/g;
@@ -105,10 +105,10 @@ sub varreplace {
 
 sub loopcheck {
     my ($data) = @_;
-    Irssi::print("data: $data");
+    #Irssi::print("data: $data");
     my @loop;
     while($data =~ /(?!\\)\{\{(?=\w)([\w\s]+?)(?<=\w)\}\}/) {
-        Irssi::print("why am I here? - pre: $`; match: $&; post: $'");
+        #Irssi::print("why am I here? - pre: $`; match: $&; post: $'");
         my $var = $1;
         if(!grep(/^$var$/, @loop)) {
             push(@loop, $var);
@@ -119,7 +119,7 @@ sub loopcheck {
             return 'ERROR';
         }
     }
-        Irssi::print("After loop: data = $data");
+        #Irssi::print("After loop: data = $data");
 	return $data;
 }
 
