@@ -3,15 +3,28 @@ use warnings;
 
 BEGIN {
     use Storable;
-    our (%foo, $firsterr, $seconderr, $farg, $sarg, @varcmds);
+    use Cwd;
+
+    our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
     my $hashref;
-    if(-e '.vardata') {
-        (($hashref = retrieve('.vardata')) && (%foo = %{$hashref}));
+    eval 'exec $PERLLOCATION/bin/perl -x $0 ${1+"$@"} ;' if 0;
+    
+    my $cwd = &Cwd::cwd();
+    Irssi::settings_add_str('vars', 'vardata_path', $cwd);
+    $config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
+
+    if(-e $config{'vardata_path'}.'.vardata') {
+        (($hashref = retrieve($config{'vardata_path'}.'.vardata')) && (%foo = %{$hashref}));
+        $loaded = 1;
     }
 }
-our (%foo, $firsterr, $seconderr, $farg, $sarg, @varcmds);
+our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
 
 @varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp');
+
+my $cwd = eval 'exec $PERLLOCATION/bin/perl -x $0 ${1+"$@"} ;' if 0;
+Irssi::settings_add_str('vars', 'vardata_path', $cwd);
+$config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
 
 sub cmd_mkvar {
     my ($data) = @_;
@@ -53,14 +66,14 @@ sub cmd_mkvar {
     }
     else {
         Irssi::print("Variable '$farg' succesfully saved with value '$sarg'");
-        store(\%foo, '.vardata');
+        store(\%foo, $config{'vardata_path'}.'.vardata');
     }
     return;
 }
 
 sub cmd_rmvar {
     my ($data) = @_;
-    if(delete $foo{$data} && store(\%foo, '.vardata')) {
+    if(delete $foo{$data} && store(\%foo, $config{'vardata_path'}.'.vardata')) {
         Irssi::print("variable '$data' has been successfully deleted");
     }
     else {
