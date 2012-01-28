@@ -10,7 +10,7 @@ BEGIN {
     eval 'exec $PERLLOCATION/bin/perl -x $0 ${1+"$@"} ;' if 0;
     
     my $cwd = &Cwd::cwd();
-    Irssi::settings_add_str('vars', 'vardata_path', '~/.irssi/scripts/);
+    Irssi::settings_add_str('vars', 'vardata_path', '~/');
     $config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
 
     if(-e $config{'vardata_path'}.'.vardata') {
