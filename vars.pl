@@ -22,10 +22,6 @@ our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
 
 @varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp');
 
-my $cwd = eval 'exec $PERLLOCATION/bin/perl -x $0 ${1+"$@"} ;' if 0;
-Irssi::settings_add_str('vars', 'vardata_path', $cwd);
-$config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
-
 sub cmd_mkvar {
     my ($data) = @_;
     $_ = $data;
