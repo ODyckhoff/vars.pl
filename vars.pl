@@ -26,7 +26,7 @@ sub cmd_mkvar {
 	$firsterr = 1;
 	$seconderr = 1;
 	
-    if(!/^(["'])(\w[\w\s]+?\w)(?<!\\)\1(?{$firsterr = 0;}),\s(["'])(.*?)(?<!\\)\3(?{$seconderr = 0;})$/) {
+    if(!/^(["'])([\w\s]+?)(?<!\\)\1(?{$firsterr = 0;}),\s(["'])(.*?)(?<!\\)\3(?{$seconderr = 0;})$/) {
         Irssi::print('Syntax Error: mixed quotes, or incorrectly formatted arguments in ' .
             ($firsterr ? 'Arg 1' : '') . ($firsterr && $seconderr ? ' and ' : '') . ($seconderr ? 'Arg 2.' : '.'));
         Irssi::print('Type /varhelp for command usage');
@@ -40,7 +40,7 @@ sub cmd_mkvar {
     while($sarg =~ /\G(?!\\)\{\{(?=\w)([\w\s]+?)(?<=\w)\}\}/g) {
         my $match = $1;
         unless($foo{$match}) {
-            Irssi::print('Variable \'{{' . $match . '}}\' does not exist. Remember to backlslash any carets you do not want interpreted. Command failed.');
+            Irssi::print('Variable \'{{' . $match . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Command failed.');
             return;
         }
     }
