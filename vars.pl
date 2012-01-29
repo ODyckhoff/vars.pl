@@ -15,7 +15,13 @@ BEGIN {
 
     if(-e $config{'vardata_path'}.'.vardata') {
         (($hashref = retrieve($config{'vardata_path'}.'.vardata')) && (%foo = %{$hashref}));
-        $loaded = 1;
+        #backwards compatibility - replace spaces in variable names with _
+        foreach my $key (sort keys %foo) {
+            my $old = $key;
+            if($key =~ s/\s/_/g) {
+                Irssi::print("WARNING: Variable '$old' renamed to '$key', since spaces are no longer permitted in variable names.");
+            }
+        }
     }
 }
 our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
@@ -26,30 +32,21 @@ sub cmd_mkvar {
     my ($data) = @_;
     $_ = $data;
 
-    if(!/(["']),\s(["'])/) { # Check that arguments are formatted correctly
+    my @args = split(/\s/, $_, 1);
+    if(scalar(@args) != 2) {
         Irssi::print("Syntax Error: Single Argument Given");
         Irssi::print('Type /varhelp for command usage');
         return;
     }
-    
-	$firsterr = 1;
-	$seconderr = 1;
-	
-    if(!/^(["'])([\w\s]+?)(?<!\\)\1(?{$firsterr = 0;}),\s(["'])(.*?)(?<!\\)\3(?{$seconderr = 0;})$/) {
-        Irssi::print('Syntax Error: mixed quotes, or incorrectly formatted arguments in ' .
-            ($firsterr ? 'Arg 1' : '') . ($firsterr && $seconderr ? ' and ' : '') . ($seconderr ? 'Arg 2.' : '.'));
-        Irssi::print('Type /varhelp for command usage');
-        return;
-    }
     else {
-        $farg = $2;
-        $sarg = $4;
+        $farg = shift @args;
+        $sarg = shift @args;
     }
 
-    while($sarg =~ /\G(?!\\)\{\{(?=\w)([\w\s]+?)(?<=\w)\}\}/g) {
+    while($sarg =~ /\G(?!\\)\{\{(\w+)(?!\\)\}\}/g) {
         my $match = $1;
         unless($foo{$match}) {
-            Irssi::print('Variable \'{{' . $match . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Command failed.');
+            Irssi::print('Inserted variable \'{{' . $match . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Command failed.');
             return;
         }
     }
@@ -116,14 +113,23 @@ sub loopcheck {
     my ($data) = @_;
     #Irssi::print("data: $data");
     my @loop;
-    while($data =~ /(?!\\)\{\{(?=\w)([\w\s]+?)(?<=\w)\}\}/) {
+    while($data =~ /(?!\\)\{\{(\w+)(?!\\)\}\}/) {
         #Irssi::print("why am I here? - pre: $`; match: $&; post: $'");
         my $var = $1;
+    
+        #first, we ensure the variable exists in the first place.
+        unless($foo{$var}) {
+            Irssi::print('Inserted variable \'{{' . $match . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Supressed.');
+            return 'ERROR';
+        }
+
+        #Now, we start making sure that there aren't any silly loops and such occurring, e.g. {{foo}} = {{bar}} and {{bar}} = {{foo}}.
         if(!grep(/^$var$/, @loop)) {
             push(@loop, $var);
             $data =~ s/\{\{$var\}\}/$foo{$var}/e;
         }
         else {
+            #Yep, someone is being an idiot... Double slap them if this is an IRC event, since they've manually changed the contents of %foo
             Irssi::print('Loop detected in variable \'' . $var . '\'');
             return 'ERROR';
         }
