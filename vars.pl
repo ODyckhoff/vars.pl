@@ -119,7 +119,7 @@ sub loopcheck {
     
         #first, we ensure the variable exists in the first place.
         unless($foo{$var}) {
-            Irssi::print('Inserted variable \'{{' . $match . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Supressed.');
+            Irssi::print('Inserted variable \'{{' . $var . '}}\' does not exist. Remember to backlslash (\{{ \}}) any variables you do not want interpreted. Supressed.');
             return 'ERROR';
         }
 
