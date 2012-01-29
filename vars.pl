@@ -133,6 +133,8 @@ sub loopcheck {
             Irssi::print('Loop detected in variable \'' . $var . '\'');
             return 'ERROR';
         }
+        #now we clear out the loop, ready for the next variable (if any) to be checked
+        @loop = ();
     }
         #Irssi::print("After loop: data = $data");
 	return $data;
