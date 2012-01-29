@@ -32,15 +32,15 @@ sub cmd_mkvar {
     my ($data) = @_;
     $_ = $data;
 
-    my @args = split(/\s/, $_, 1);
-    if(scalar(@args) != 2) {
-        Irssi::print("Syntax Error: Single Argument Given");
+    my @args = split(/\s/);
+    if(scalar(@args) < 2) {
+        Irssi::print('Syntax Error: ' . scalar(@args) == 1 ? 'Single' : 'No' . ' Argument Given');
         Irssi::print('Type /varhelp for command usage');
         return;
     }
     else {
         $farg = shift @args;
-        $sarg = shift @args;
+        $sarg = join(' ', @args);
     }
 
     while($sarg =~ /\G(?!\\)\{\{(\w+)(?!\\)\}\}/g) {
