@@ -7,19 +7,20 @@ BEGIN {
 
     our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
     my $hashref;
-    eval 'exec $PERLLOCATION/bin/perl -x $0 ${1+"$@"} ;' if 0;
     
-    my $cwd = &Cwd::cwd();
     Irssi::settings_add_str('vars', 'vardata_path', '/home/pyro/');
     $config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
 
     if(-e $config{'vardata_path'}.'.vardata') {
         (($hashref = retrieve($config{'vardata_path'}.'.vardata')) && (%foo = %{$hashref}));
+        
         #backwards compatibility - replace spaces in variable names with _
         foreach my $key (sort keys %foo) {
             my $old = $key;
             if($key =~ s/\s/_/g) {
                 Irssi::print("WARNING: Variable '$old' renamed to '$key', since spaces are no longer permitted in variable names.");
+                $foo{$key} = $foo{$old};
+                delete $foo{$old} && store(\%foo, $config{'vardata_path'}.'.vardata')
             }
         }
     }
