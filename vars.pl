@@ -27,6 +27,7 @@ BEGIN {
     }
 }
 our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds, @tabcmds, @keys);
+our $pre;
 
 @varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp');
 @tabcmds = ('mkvar', 'rmvar');
@@ -56,12 +57,15 @@ sub tab_complete {
     }
 
     @$strings = (); #clear out any old rubbish that may be lingering
+    $pre = '';
     foreach my $key (sort { lc($a) cmp lc($b) } keys %foo) {
-        $word =~ s/\{\{//;
+        $word =~ s/(.*)\{\{//;
+        $pre = $1 unless $pre; #get all the stuff in front of {{ just in case
         if($key =~ /^$word/i) {
             push(@$strings,
-                $brace ? '{{'.$key.'}}'
-                       : $key
+                ($pre   ? $pre : '') .
+                ($brace ? '{{'.$key.'}}'
+                       : $key)
             );
         }
     }
