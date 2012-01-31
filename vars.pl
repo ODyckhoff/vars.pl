@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use Irssi::TextUI;
 
 BEGIN {
     use Storable;
@@ -25,9 +26,38 @@ BEGIN {
         }
     }
 }
-our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds);
+our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds, @tabcmds, @keys);
 
 @varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp');
+@tabcmds = ('mkvar', 'rmvar');
+
+sub tab_complete {
+    my $testre = qr/^\/(mk|rm)var/; #only one regex to change.
+    my ($strings, $window, $word, $linestart, $want_space) = @_;
+    Irssi::print("\$linestart: '$linestart'");
+    Irssi::print("\$word: '$word'");
+    my $post;
+    my $brace;
+    Irssi::print("\$linestart . ' ' . \$word= '$linestart $word'");
+    if ($linestart =~ /$testre/) {
+        #build list of eligible words using $word.
+        $post = $';
+        foreach my $key (sort keys %foo) {
+            if($word !~ /\W/ || $post) {
+                #/(?<!\\)\{\{(\w+(?!\}\}))?$/
+                Irssi::print("Tab Completion Event");
+            
+                push @$strings, qw/bar baz bacon/;
+                $$want_space = 0;
+                Irssi::signal_stop;
+            }
+        }
+    }
+    else {
+        undef @$strings;
+        return;
+    }
+}      
 
 sub cmd_mkvar {
     my ($data) = @_;
@@ -68,10 +98,10 @@ sub cmd_mkvar {
 sub cmd_rmvar {
     my ($data) = @_;
     if(delete $foo{$data} && store(\%foo, $config{'vardata_path'}.'.vardata')) {
-        Irssi::print("variable '$data' has been successfully deleted");
+        Irssi::print("Variable '$data' has been successfully deleted");
     }
     else {
-        Irssi::print("variable '$data' not found");
+        Irssi::print("Variable '$data' not found");
     }
     return;
 }
@@ -188,3 +218,4 @@ Irssi::command_bind('varhelp', 'help');
 Irssi::command_bind('varlist', 'listvars');
 #Irssi::signal_add('send text', 'varreplace');
 Irssi::signal_add('send command', 'varreplace');
+Irssi::signal_add_first("complete word", 'tab_complete');
