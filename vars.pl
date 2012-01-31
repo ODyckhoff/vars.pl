@@ -35,20 +35,20 @@ our $pre;
 sub tab_complete {
     my $testre = qr/^\/(mk|rm)var/; #only one regex to change.
     my ($strings, $window, $word, $linestart, $want_space) = @_;
-    Irssi::print("\$linestart: '$linestart'");
-    Irssi::print("\$word: '$word'");
+    #Irssi::print("\$linestart: '$linestart'");
+    #Irssi::print("\$word: '$word'");
     my $post;
     my $brace;
     my $primed = 0;
     if ($linestart =~ /$testre/) {
         #build list of eligible words using $word.
         $post = $';
-        Irssi::print($post) if $post;
+        #Irssi::print($post) if $post;
         return unless((!$post && $word !~ /\W/)
-          ||(($post && $word =~ /(?<!\\)\{\{((\w+)(?!\}\}))?$/) 
+          ||(($post && $word =~ /\{\{((\w+)((?!\\\}\})|(?!\}\})))?$/) 
           && eval {$brace = 1; return 1}));
     }
-    elsif($word =~ /(?<!\\)\{\{((\w+)(?!\}\}))?$/) {
+    elsif($word =~ /\{\{((\w+)((?!\\\}\})|(?!\}\})))?$/) {
         $brace = 1;
     }
     else {
