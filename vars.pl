@@ -38,25 +38,35 @@ sub tab_complete {
     Irssi::print("\$word: '$word'");
     my $post;
     my $brace;
-    Irssi::print("\$linestart . ' ' . \$word= '$linestart $word'");
+    my $primed = 0;
     if ($linestart =~ /$testre/) {
         #build list of eligible words using $word.
         $post = $';
-        foreach my $key (sort keys %foo) {
-            if($word !~ /\W/ || $post) {
-                #/(?<!\\)\{\{(\w+(?!\}\}))?$/
-                Irssi::print("Tab Completion Event");
-            
-                push @$strings, qw/bar baz bacon/;
-                $$want_space = 0;
-                Irssi::signal_stop;
-            }
-        }
+        Irssi::print($post) if $post;
+        return unless((!$post && $word !~ /\W/)
+          ||(($post && $word =~ /(?<!\\)\{\{((\w+)(?!\}\}))?$/) 
+          && eval {$brace = 1; return 1}));
+    }
+    elsif($word =~ /(?<!\\)\{\{((\w+)(?!\}\}))?$/) {
+        $brace = 1;
     }
     else {
-        undef @$strings;
+        @$strings = ();
         return;
     }
+
+    @$strings = (); #clear out any old rubbish that may be lingering
+    foreach my $key (sort { lc($a) cmp lc($b) } keys %foo) {
+        $word =~ s/\{\{//;
+        if($key =~ /^$word/i) {
+            push(@$strings,
+                $brace ? '{{'.$key.'}}'
+                       : $key
+            );
+        }
+    }
+    $$want_space = 0;
+    Irssi::signal_stop;
 }      
 
 sub cmd_mkvar {
