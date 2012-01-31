@@ -82,6 +82,10 @@ sub cmd_mkvar {
     else {
         $farg = shift @args;
         $sarg = join(' ', @args);
+        if($farg =~ /\W/) {
+            Irssi::print('Error: only alphanumeric characters (A-Z, a-z, 0-9 and _) are permitted in variable names.');
+            return;
+        }
     }
 
     while($sarg =~ /\G(?!\\)\{\{(\w+)(?!\\)\}\}/g) {
