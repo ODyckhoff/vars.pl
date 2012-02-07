@@ -6,11 +6,16 @@ BEGIN {
     use Storable;
     use Cwd;
 #build undo and redo stack
-    our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds, @undo, @redo);
+    our (%config, %foo, $farg, $sarg, @varcmds, @undo, @redo);
     my $hashref;
     
-    Irssi::settings_add_str('vars', 'vardata_path', '/home/pyro/');
-    $config{'vardata_path'} = Irssi::settings_get_str('vardata_path');
+    my $user = getpwuid($<);
+    $config{'vardata_path'} = '/home/' . $user . '.irssi/scripts/varspl/';
+    mkdir $config{'vardata_path'} unless -e $config{'vardata_path'};
+    
+    #move .vardata to its new home if it exists
+    use File::Copy;
+    move('/home/' . $user . '/.vardata', $config{'vardata_path'} . '/.vardata') if -e '/home/' . $user . '/.vardata';
 
     if(-e $config{'vardata_path'}.'.vardata') {
         (($hashref = retrieve($config{'vardata_path'}.'.vardata')) && (%foo = %{$hashref}));
@@ -25,8 +30,9 @@ BEGIN {
             }
         }
     }
+    
 }
-our (%config, %foo, $loaded, $firsterr, $seconderr, $farg, $sarg, @varcmds, @tabcmds, @undo, @redo);
+our (%config, %foo, $farg, $sarg, @varcmds, @tabcmds, @undo, @redo);
 our $pre;
 
 @varcmds = ('mkvar', 'rmvar', 'varlist', 'varhelp', 'undo', 'redo', 'editvar', 'cpvar');
