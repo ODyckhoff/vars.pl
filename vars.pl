@@ -10,15 +10,17 @@ BEGIN {
     my $hashref;
     
     my $user = getpwuid($<);
-    $config{'vardata_path'} = '/home/' . $user . '.irssi/scripts/varspl/';
+    Irssi::print($user);
+    $config{'vardata_path'} = '/home/' . $user . '/.irssi/scripts/varspl';
     mkdir $config{'vardata_path'} unless -e $config{'vardata_path'};
+    Irssi::print($!);
     
     #move .vardata to its new home if it exists
     use File::Copy;
     move('/home/' . $user . '/.vardata', $config{'vardata_path'} . '/.vardata') if -e '/home/' . $user . '/.vardata';
 
-    if(-e $config{'vardata_path'}.'.vardata') {
-        (($hashref = retrieve($config{'vardata_path'}.'.vardata')) && (%foo = %{$hashref}));
+    if(-e $config{'vardata_path'}.'/.vardata') {
+        (($hashref = retrieve($config{'vardata_path'}.'/.vardata')) && (%foo = %{$hashref}));
         
         #backwards compatibility - replace spaces in variable names with _
         foreach my $key (sort keys %foo) {
@@ -26,7 +28,7 @@ BEGIN {
             if($key =~ s/\s/_/g) {
                 Irssi::print("WARNING: Variable '$old' renamed to '$key', since spaces are no longer permitted in variable names.");
                 $foo{$key} = $foo{$old};
-                delete $foo{$old} && store(\%foo, $config{'vardata_path'}.'.vardata')
+                delete $foo{$old} && store(\%foo, $config{'vardata_path'}.'/.vardata')
             }
         }
     }
@@ -155,16 +157,16 @@ sub cmd_mkvar {
     else {
         $foo{$farg} = $sarg;
         Irssi::print("Variable '$farg' succesfully saved with value '$sarg'");
-        store(\%foo, $config{'vardata_path'}.'.vardata');
+        store(\%foo, $config{'vardata_path'}.'/.vardata');
         
         #build undo and redo stack
         my $undoRef = sub {
                         delete $foo{$farg};
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $redoRef = sub {
                         $foo{$farg} = $sarg;
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $undoTxt = "Deleted variable '$farg' containing value: '$sarg'";
         my $redoTxt = "Recreated variable '$farg' containing value: '$sarg'";
@@ -209,16 +211,16 @@ sub cmd_editvar {
     }
     else {
         Irssi::print("Variable '$farg' succesfully saved with new value '$sarg'");
-        store(\%foo, $config{'vardata_path'}.'.vardata');
+        store(\%foo, $config{'vardata_path'}.'/.vardata');
 
         #build undo and redo stack
         my $undoRef = sub {
                         $foo{$farg} = $tmp;
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $redoRef = sub {
                         $foo{$farg} = $sarg;
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $undoTxt = "Value of variable '$farg' reverted from '$sarg' to '$tmp'.";
         my $redoTxt = "Value of variable '$farg' changed again from '$tmp' to '$sarg'";
@@ -267,24 +269,24 @@ sub cmd_cpvar {
             $tmp = $foo{$newvar};
             $foo{$newvar} = $foo{$var};
             Irssi::print("Contents of variable '$var' successfully copied to existing variable '$newvar'.");
-            store(\%foo, $config{'vardata_path'}.'.vardata');
+            store(\%foo, $config{'vardata_path'}.'/.vardata');
         }
     }
     else {
         $foo{$newvar} = $foo{$var};
         Irssi::print("Contents of variable '$var' successfully copied to new variable '$newvar'.");
-        store(\%foo, $config{'vardata_path'}.'.vardata');
+        store(\%foo, $config{'vardata_path'}.'/.vardata');
     }
 
     #build undo and redo stack
     if($tmp) {
         my $undoRef = sub {
                         $foo{$newvar} = $tmp;
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $redoRef = sub {
                         $foo{$newvar} = $foo{$var};
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $undoTxt = "Old value of variable '$newvar' restored from '".$foo{$var}."' to '$tmp'.";
         my $redoTxt = "New value of variable '$newvar' restored from '$tmp' to '".$foo{$var}."'.";
@@ -294,11 +296,11 @@ sub cmd_cpvar {
     else {
         my $undoRef = sub {
                         delete $foo{$newvar};
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $redoRef = sub {
                         $foo{$newvar} = $foo{$var};
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $undoTxt = "Variable '$newvar' removed.";
         my $redoTxt = "New variable '$newvar' restored with value '".$foo{$var}."'.";
@@ -311,17 +313,17 @@ sub cmd_cpvar {
 sub cmd_rmvar {
     my ($data) = @_;
     my $tmp = $foo{$data};
-    if(delete $foo{$data} && store(\%foo, $config{'vardata_path'}.'.vardata')) {
+    if(delete $foo{$data} && store(\%foo, $config{'vardata_path'}.'/.vardata')) {
         Irssi::print("Variable '$data' has been successfully deleted");
 
         #build undo and redo stack
         my $undoRef = sub {
                         $foo{$data} = $tmp;
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $redoRef = sub {
                         delete $foo{$data};
-                        store(\%foo, $config{'vardata_path'}.'.vardata');
+                        store(\%foo, $config{'vardata_path'}.'/.vardata');
                       };
         my $undoTxt = "Deleted variable '$data' restored with value '$tmp'.";
         my $redoTxt = "Variable '$data' deleted again.";
