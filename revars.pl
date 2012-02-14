@@ -22,14 +22,15 @@ our (%config, %vars, @varcmds, @tabcmds);
 $config{'vardata_path'} = catfile( get_irssi_dir(), '.vardata' );
 
 ## Move things around (if necessary) for backwards compatibility with older versions of the script.
-make_compatible();
+make_compatible_dirs();
 
 ## Load the '.vardata' file if it exists and place contents in variable hash.
+load_vars();
+
 ### If '.vardata' is loaded successfully, run more backwards compatibility operations.
-#### Replace spaces in variable names with an underscore.
-#### Remove underscores from the start of variable names.
-##### Alert user of any resulting name collisions.
-###### Assign the problem variable to a randomly generated name, and notify the user of this name.
+make_compatible_vars();
+
+# INITIALISATION COMPLETE.
 
 # Add Irssi command bindings.
 Irssi::command_bind(  'mkvar', 'cmd_mkvar'  );
@@ -49,13 +50,31 @@ Irssi::signal_add_first('complete word', 'tab_complete');
 # Script specific subroutines.
 
 ## Utility subroutines.
+sub gen_rand_name {
+    # Generates a random variable name in the event of name collisions.
+    my $rand_name;
+    
+    do {
+        my $string;
+        my $length = 8;
+        my @chars = ('a'..'z', 'A'..'Z', '0'..'9');
+        foreach (1 .. $length) {
+            $string .= $chars[rand @chars];
+        }
+        $rand_name = $string;
+    }
+    while $foo{$rand_name};
+    
+    return $rand_name;
+}
+
 sub get_caller {
     # Get the name of the subroutine calling the subroutine that called this...
     # Not sure how to say that any simpler.
     return ( caller(2) )[3];
 }
 
-sub make_compatible {
+sub make_compatible_dirs {
     # Move files around from locations where an older script would expect things to be.
     my $home   = home();
     my $path   = catfile($home, '.vardata'); # Path of .vardata on older versions of vars.pl.
@@ -88,6 +107,45 @@ sub make_compatible {
     }
 }
 
+sub make_compatible_vars {
+    my $warning;
+    foreach my $key (sort keys %vars) {
+        my $old = $key;
+        if($key =~ s/\s/_/g) {
+            # First, replace spaces in variable names with an underscore.
+            $warning = "WARNING: Variable '$old' marked for renaming to '$key', since spaces are no longer permitted in variable names.";
+        }
+        
+        if($key =~ s/^_+//) {
+            # Secondly, remove underscores from the beginning of variable names
+            if($warning) {
+                $warning = "WARNING: Variable '$old' marked for renaming to '$key', since spaces are no longer permitted and underscores should not begin variable names.";
+            }
+            else {
+                $warning = "WARNING: Variable '$old' marked for renaming to '$key', since underscores should not begin variable names.";
+            }
+        }
+        
+        Irssi::print($warning, MSGLEVEL_CLIENTCRAP);
+
+        if($vars{$key}) {
+            # Uh-oh, we have a name collision. Lets generate a random variable name and let the user know about it
+            my $rand_name = gen_rand_name();
+            $warning = "WARNING: Automatic attempt to rename variable '$old' causes a name collision with '$new'.\n"
+                     . "Variable being given random name '$rand_name' instead. Use '/mvvar' to rename it.";
+            $key = $rand_name;
+        }
+
+        Irssi::print($warning, MSGLEVEL_CLIENTCRAP);
+
+        if($key != $old) {
+            $vars{$key} = $vars{$old};
+            delete $vars{$old};
+            save_vars();
+        }
+    }
+}
+
 ## Undo/Redo operations.
 sub gen_stack {
 
@@ -103,11 +161,20 @@ sub redo {
 
 ## File operations.
 sub load_vars {
-
+    my $hashref;
+    if( $hashref = retrieve($config{'vardata_path'}) ) {
+        %vars = %{$hashref};
+    }
+    else {
+        Irssi::print('No .vardata file found. This is either because this is your first run, or because permissions are wrong.' . "\n"
+                   . 'If this is your first run, don\'t worry, this file will be created for you.' . "\n"
+                   . 'If you have created variables before, please make sure that .vardata exists in \'' . $config{'vardata_path'} 
+                   . '\' and that the correct permissions are set, then use /varsreload to try again.', MSGLEVEL_CLIENTCRAP);
+    }
 }
 
 sub save_vars {
-
+    store(\%vars, $config{'vardata_path'});
 }
 
 ## Variables hash operations.
