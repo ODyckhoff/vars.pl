@@ -179,34 +179,35 @@ sub save_vars {
 
 ## Variables hash operations.
 sub access_vars {
-
+    my ($key) = @_;
 }
 
 sub edit_vars {
-
+    my ($key, $value) = @_;
 }
 
 ### access_vars operations
 sub var_exists {
-
+    my ($key) = @_;
 }
 
 sub expand {
     # This subroutine will take care of checking for infinite loops as well as expansion.
     # There's nothing stopping a user with a rogue script fiddling with vars.pl variables and/or files.
+    my ($key) = @_;
 }
 
 ### edit_vars operations
 sub add_var {
-
+    my ($key, $value) = @_;
 }
 
 sub change_var {
-
+    my ($key, $value) = @_;
 }
 
 sub remove_var {
-
+    my ($key) = @_;
 }
 
 # Irssi signal subroutines.
@@ -252,6 +253,6 @@ sub cmd_redo {
 
 }
 
-sub help {
+sub cmd_help {
 
 }
