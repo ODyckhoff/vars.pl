@@ -16,10 +16,17 @@ use File::Spec::Functions;
 
 # Important script startup instructions.
 ## Initialise required globally accessible variables.
-our (%config, %vars, @varcmds, @tabcmds);
+our (%config, %vars, %regexes, @varcmds, @tabcmds);
 
 ## Set globally accessible variables, where appropriate/possible.
 $config{'vardata_path'} = catfile( get_irssi_dir(), '.vardata' );
+
+%regexes = (
+    'move'   => qr/make_compatible_vars|mvvar/,
+    'change' => qr/cpvar|editvar/,
+    'add'    => qr/mkvar|/,
+    'remove' => qr//,
+);
 
 ## Move things around (if necessary) for backwards compatibility with older versions of the script.
 make_compatible_dirs();
@@ -63,7 +70,7 @@ sub gen_rand_name {
         }
         $rand_name = $string;
     }
-    while $foo{$rand_name};
+    while var_exists($rand_name);
     
     return $rand_name;
 }
@@ -101,7 +108,8 @@ sub make_compatible_dirs {
 
         # If we made it here, there's some redundant folders that need cleaning up.
         File::Path::rmtree( catfile( get_irssi_dir(), 'scripts/varspl' ) )
-            or Irssi::print($! . ' Please remove this directory manually.', MSGLEVEL_CLIENTERROR);
+            or Irssi::print($! . ' Please remove this directory manually.',
+                   MSGLEVEL_CLIENTERROR);
 
         # No force unload needed here, as relevant files have been moved successfully.
     }
@@ -128,7 +136,7 @@ sub make_compatible_vars {
         
         Irssi::print($warning, MSGLEVEL_CLIENTCRAP);
 
-        if($vars{$key}) {
+        if(var_exists($key)) {
             # Uh-oh, we have a name collision. Lets generate a random variable name and let the user know about it
             my $rand_name = gen_rand_name();
             $warning = "WARNING: Automatic attempt to rename variable '$old' causes a name collision with '$new'.\n"
@@ -139,8 +147,8 @@ sub make_compatible_vars {
         Irssi::print($warning, MSGLEVEL_CLIENTCRAP);
 
         if($key != $old) {
-            $vars{$key} = $vars{$old};
-            delete $vars{$old};
+            edit_vars($key, $old);
+            remove_var($old);
             save_vars();
         }
     }
@@ -169,7 +177,8 @@ sub load_vars {
         Irssi::print('No .vardata file found. This is either because this is your first run, or because permissions are wrong.' . "\n"
                    . 'If this is your first run, don\'t worry, this file will be created for you.' . "\n"
                    . 'If you have created variables before, please make sure that .vardata exists in \'' . $config{'vardata_path'} 
-                   . '\' and that the correct permissions are set, then use /varsreload to try again.', MSGLEVEL_CLIENTCRAP);
+                   . '\' and that the correct permissions are set, then use /varsreload to try again.',
+            MSGLEVEL_CLIENTCRAP);
     }
 }
 
@@ -179,35 +188,41 @@ sub save_vars {
 
 ## Variables hash operations.
 sub access_vars {
-    my ($key) = @_;
+    
 }
 
 sub edit_vars {
-    my ($key, $value) = @_;
+    my $caller = get_caller();
+    if($caller =~ /make_compatible_vars|mvvar/) {
+        my ($new, $old) = @_;
+        if(add_var($new)) {
+            remove_var($old);
+        }
+    }
 }
 
 ### access_vars operations
 sub var_exists {
-    my ($key) = @_;
+ 
 }
 
 sub expand {
     # This subroutine will take care of checking for infinite loops as well as expansion.
     # There's nothing stopping a user with a rogue script fiddling with vars.pl variables and/or files.
-    my ($key) = @_;
+    
 }
 
 ### edit_vars operations
 sub add_var {
-    my ($key, $value) = @_;
+
 }
 
 sub change_var {
-    my ($key, $value) = @_;
+    
 }
 
 sub remove_var {
-    my ($key) = @_;
+    
 }
 
 # Irssi signal subroutines.
@@ -222,7 +237,40 @@ sub tab_complete {
 
 # Irssi command subroutines.
 sub cmd_mkvar {
+    my ($data) = @_;
+    my ($name, $value);
 
+    my @args    = split(/\s/, $data);
+    my $argsize = scalar(@args);
+
+    if($argsize < 2) {
+        Irssi::print('Syntax Error: ' . $argsize ? 'Single' : 'No' . ' Argument Given',
+            MSGLEVEL_CLIENTCRAP);
+        Irssi::print('Type "/help vars mkvar" for command usage',
+            MSGLEVEL_CLIENTCRAP);
+        return;
+    }
+    else {
+        $name = shift(@args); # Get the first argument, or name of the variable.
+        $value = join(' ', @args); # Everything else is the value, so put the string back together.
+        
+        # Check variable name is legal.
+        if(var_exists($name)) {
+            Irssi::print("Error: variable '$name' already exists. Use /editvar to overwrite",
+                MSGLEVEL_CLIENTCRAP);
+            return;
+        }
+        if($name =~ /(^_)|(\W)/) {
+            Irssi::print('Error: only alphanumeric characters (A-Z, a-z, 0-9 and _) are permitted in variable names, and names cannot start with underscores.',
+                MSGLEVEL_CLIENTCRAP);
+            return;
+        }
+
+        # Check variable value is legal, and doesn't initiate any loops.
+        # This is theoretically impossible since you can't reference variables which don't exist, but it's always good to be safe.
+        if($value) {
+            
+    }
 }
 
 sub cmd_rmvar {
