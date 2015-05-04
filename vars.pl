@@ -223,6 +223,11 @@ sub err {
 
 }
 
+sub save_vars {
+    my $file = $cfg{ VPATH } . Irssi::settings_get_str( $cfg{ NAME } . '_varfile' );
+    store( \%vars, $file ) if -e $file;
+}
+
 ### PLUGIN SUBS ###
 
 
