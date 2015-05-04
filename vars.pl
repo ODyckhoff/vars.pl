@@ -16,16 +16,17 @@ our %IRSSI = (
     description => 'A more powerful variables interface for Irssi.'
 );
 
-Irssi::command_bind('mkvar', 'cmd_mkvar');
-Irssi::command_bind('rmvar', 'cmd_rmvar');
-Irssi::command_bind('edvar', 'cmd_edvar');
-Irssi::command_bind('cpvar', 'cmd_cpvar');
-Irssi::command_bind('help', 'cmd_help');
-Irssi::command_bind('lsvar', 'cmd_lsvar');
-Irssi::command_bind('undo', 'cmd_undo');
-Irssi::command_bind('redo', 'cmd_redo');
-Irssi::signal_add('send command', 'signal_proc');
-Irssi::signal_add_first('complete word', 'tab_complete');
+Irssi::command_bind( 'mkvar', 'cmd_mkvar' );
+Irssi::command_bind( 'rmvar', 'cmd_rmvar' );
+Irssi::command_bind( 'edvar', 'cmd_edvar' );
+Irssi::command_bind( 'cpvar', 'cmd_cpvar' );
+Irssi::command_bind( 'help' , 'cmd_help'  );
+Irssi::command_bind( 'lsvar', 'cmd_lsvar' );
+Irssi::command_bind( 'undo' , 'cmd_undo'  );
+Irssi::command_bind( 'redo' , 'cmd_redo'  );
+
+Irssi::signal_add( 'send command', 'signal_proc' );
+Irssi::signal_add_first( 'complete word', 'tab_complete' );
 
 ### SCRIPT SETUP ###
 our( %cfg, %vars, %err, @varcmds, @tabcmds, @undo, @redo );
@@ -143,14 +144,14 @@ sub cmd_cpvar {
 
 sub cmd_lsvar {
 
-    my ($arg) = shift;
+    my ( $arg ) = shift;
 
-    if(!%vars) {
+    if( ! %vars ) {
         err( ENOVARS ) && return;
     }
 
     Irssi::print( '', MSGLEVEL_CLIENTCRAP );
-    if($arg) {
+    if( $arg ) {
         Irssi::print( "\x02\x035"."Listing all variables matching '$arg':", MSGLEVEL_CLIENTCRAP );
     }
     else {
@@ -166,18 +167,23 @@ sub cmd_lsvar {
         my $value = $vars{ $key };
         my $check = chk_loop( $value );
         
-        if( $check->{'error'} ) {
+        if( $check->{ 'error' } ) {
             err( ELOOP ) && return;
         }
         else {
-            Irssi::print( "\x038\x02$key\x03" . ': \'' . $vars{$key} . '\''
-                            . ( $check->{'text'} ? 
-                                  " - ('\x033\x02\x02" . $check->{'text'} . "\x03')"
+            my $txt = $check->{ 'text' };
+
+            Irssi::print( "\x038\x02$key\x03" . ': \'' . $vars{ $key } . '\''
+                            . ( $check->{ 'text' } ? 
+                                  " - ('\x033\x02\x02" . $check->{ 'text' } . "\x03')"
                               :
                                   ''
                               ), MSGLEVEL_CLIENTCRAP
                          )
-            if( $value =~ qr/$arg/ || $key =~ qr/$arg/ || $check->{'text'} =~ qr/$arg/ );
+            if( $value =~ qr/$arg/ 
+               || $key =~ qr/$arg/
+               || $txt =~ qr/$arg/
+            );
         }
     }
 }
@@ -203,7 +209,7 @@ sub cmd_redo {
 sub chk_loop {
     my %rtnobj = ();
 
-    $rtnobj{'text'} = "testing";
+    $rtnobj{ 'text' } = "testing";
 
     return \%rtnobj;
 }
@@ -212,7 +218,7 @@ sub err {
 
     my $code = shift;
 
-    Irssi::print('[varspl] Error: ' . $code . ' - "' . $err{ $code }{ 'text' } . '"', MSGLEVEL_CLIENTCRAP );
+    Irssi::print( '[varspl] Error: ' . $code . ' - "' . $err{ $code }{ 'text' } . '"', MSGLEVEL_CLIENTCRAP );
     return $code if( $err{ $code }{ 'fatal' } );
 
 }
