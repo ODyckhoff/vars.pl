@@ -179,26 +179,19 @@ sub cmd_lsvar {
     foreach my $key ( sort { lc( $a ) cmp lc( $b ) } keys %vars ) {
 
         my $value = $vars{ $key };
-        my $check = chk_loop( $value );
-        
-        if( $check->{ 'error' } ) {
-            err( ELOOP ) && return;
-        }
-        else {
-            my $txt = $check->{ 'text' };
-
-            Irssi::print( "\x038\x02$key\x03" . ': \'' . $vars{ $key } . '\''
-                            . ( $check->{ 'text' } ? 
-                                  " - ('\x033\x02\x02" . $check->{ 'text' } . "\x03')"
-                              :
-                                  ''
-                              ), MSGLEVEL_CLIENTCRAP
-                         )
-            if( $value =~ qr/$arg/ 
-               || $key =~ qr/$arg/
-               || $txt =~ qr/$arg/
-            );
-        }
+        my $full = replace( $value );
+    
+        Irssi::print( "\x038\x02$key\x03" . ': \'' . $vars{ $key } . '\''
+                        . ( $full ne $value ? 
+                              " - ('\x033\x02\x02" . $full . "\x03')"
+                          :
+                              ''
+                          ), MSGLEVEL_CLIENTCRAP
+                     )
+        if( $value  =~ qr/$arg/ 
+           || $key  =~ qr/$arg/
+           || $full =~ qr/$arg/
+        );
     }
 }
 
