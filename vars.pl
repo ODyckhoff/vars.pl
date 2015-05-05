@@ -250,7 +250,7 @@ sub replace {
             $replaced = extrapolate( $name, $prefix );
             
             $varmatch =~ s/([\\\[\]\(\)\{\}\.\^\$\*\+\?])/\\$1/g;
-            $out =~ s/$varmatch/$replaced/;
+            $out =~ s/(?<!\\)$varmatch/$replaced/;
         }
     }
 
