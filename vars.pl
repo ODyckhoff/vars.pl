@@ -32,8 +32,8 @@ Irssi::signal_add_first( 'complete word', 'tab_complete' );
 our( %cfg, %vars, %err, @varcmds, @tabcmds, @undo, @redo );
 
 our $plainvar  = qr/\{\{(\w+)\}\}/;
-our $pluginvar = qr/\{([ -~]*?)\{(\w+)\}\}/;
-
+our $pluginvar = qr/\{([^{}|]*?)\{(.+?)\}\}/; # {, } and | are reserved for script functionality.
+                                                   # \ is just plain not allowed.
 # Script configuration and constants.
 my $user = getpwuid( $< );
 
@@ -52,6 +52,7 @@ use constant {
     ENOIN   => 2,
     ENOSRV  => 3,
     ELOOP   => 4,
+    ENOKEY  => 5,
 };
 
 %err = (
@@ -79,6 +80,11 @@ use constant {
         fatal => 1,
         text  => "Loop detected in variable."
     },
+
+    5 => {
+        fatal => 1,
+        text  => "No such variable '%s'"
+    }
 );
 
 @varcmds = ( 'mkvar', 'rmvar', 'lsvar', 'undo', 'redo', 'edvar', 'cpvar' );
@@ -120,15 +126,9 @@ sub signal_proc {
     }
 
     my ( $code, $out ) = replace( $data );
-    Irssi::print($code);
     Irssi::print($out);
 
-    if( $code ) {
-        # Error somewhere.
-        err( $code );
-        Irssi::signal_stop();
-    }
-    else {
+    if( ! $code ) {
         Irssi::signal_continue( $out, $server, $witem );
     }
 
@@ -216,45 +216,69 @@ sub replace {
         return ( 0, $out );
     }
 
+    # Loop through any possible matches.
     while( $in =~ /(\\*?)($plainvar|$pluginvar)/g ) {
-        Irssi::print("found a match.");
-        Irssi::print($1) if $1;
         my ( $flag, $prefix, $name );
         if( $4 ) {
             $flag = 'plugin';
-            $prefix = $3;
-            $name = $4;
-            Irssi::print($name);
+            $prefix = $4;
+            $name = $5;
         }
         else {
             $flag = 'plain';
+            $prefix = '';
             $name = $3;
             Irssi::print($name);
         }
 
+        my $slashes  = '';
+           $slashes  = $1 if defined $1;
+        my $varmatch = $2;
+
         # Check slashes for escapisms.
         my $count = 0;
-           $count = length( $1 ) if defined $1;
+           $count = length( $slashes );
 
         if( $count % 2 ) {
             # Odd number of slashes, so this one is escaped.
-            Irssi::print("ESCAPED");
             next;
         }
         else {
-            $out =~ s/$2/REPLACED/;
+            err( ENOKEY, $name ) && return ( ENOKEY, $out ) if ! $vars{ $name } && $flag eq 'plain';
+
+            my $replaced = '';
+            $replaced = extrapolate( $name, $prefix );
+            
+            $varmatch =~ s/([\\\[\]\(\)\{\}\.\^\$\*\+\?])/\\$1/g;
+            $out =~ s/$varmatch/$replaced/;
         }
     }
-    Irssi::print("broke out of loop");
+
+    # Clean up.
+    $out =~ s/\\\{/{/g;
+    $out =~ s/\\\}/}/g;
+
     return (0, $out); 
 }
 
-sub cmd_undo {
+sub extrapolate {
+    my ( $name, $prefix ) = @_;
+    my $tmp = '';
 
-}
+    if( ! $prefix || ( $prefix && $vars{ $name } ) ) {
+        $tmp = $vars{ $name };
+        if( $tmp =~ /\{\{.+\}\}/ ) {
+            my @arr = replace( $tmp );
+            $tmp = $arr[1];
+        }
+    }
 
-sub cmd_redo {
+    if( $prefix ) {
+        $tmp = $name if not $tmp;
+        $tmp = pluginHandler( $tmp, $prefix );
+    }
 
+    return $tmp;
 }
 
 sub chk_loop {
@@ -268,10 +292,16 @@ sub chk_loop {
 sub err {
 
     my $code = shift;
+    my $text = $err{ $code }{ 'text' };
+    
+    while( $text =~ /(%[sd])/g ) {
+        my $arg = shift;
+        $text =~ s/$1/$arg/;
+    }
 
-    Irssi::print( '[varspl] Error: ' . $code . ' - "' . $err{ $code }{ 'text' } . '"', MSGLEVEL_CLIENTCRAP );
+    Irssi::print( '[varspl] Error: ' . $code . ' - "' . $text . '"', MSGLEVEL_CLIENTCRAP );
 
-    return $code if( $err{ $code }{ 'fatal' } );    
+    Irssi::signal_stop() if( $err{ $code }{ 'fatal' } );
 }
 
 sub save_vars {
@@ -279,8 +309,23 @@ sub save_vars {
     store( \%vars, $file ) if -e $file;
 }
 
+sub cmd_undo {
+
+}
+
+sub cmd_redo {
+
+}
+
 ### PLUGIN SUBS ###
 
+sub pluginHandler {
+
+    my ( $text, $prefix ) = @_;
+
+    return scalar reverse $text;
+
+}
 
 ### HELP SUBS ###
 sub cmd_help {
