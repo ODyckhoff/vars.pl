@@ -31,19 +31,23 @@ Irssi::signal_add_first( 'complete word', 'tab_complete' );
 ### SCRIPT SETUP ###
 our( %cfg, %vars, %err, @varcmds, @tabcmds, @undo, @redo );
 
+our $plainvar  = qr/\{\{(\w+)\}\}/;
+our $pluginvar = qr/\{([ -~]*?)\{(\w+)\}\}/;
+
 # Script configuration and constants.
 my $user = getpwuid( $< );
 
 %vars = ( );
 
 %cfg = (
-    NAME => 'varspl',
+    NAME  => 'varspl',
     VPATH => '/home/' . $user . '/.irssi/',
-    USER => $user,
+    USER  => $user,
 );
 
 # Error constants.
 use constant {
+    ENOACT  => 0,
     ENOVARS => 1,
     ENOIN   => 2,
     ENOSRV  => 3,
@@ -51,6 +55,11 @@ use constant {
 };
 
 %err = (
+    0 => {
+        fatal => 0,
+        text  => "No errors or nothing to do."
+    },
+
     1 => { 
         fatal => 1,
         text  => "No variables in vars datastructure."
@@ -105,9 +114,14 @@ sub signal_proc {
         return if @matches;
     }
 
-    err( ENOSRV  ) and return if ( ! $server || ! $server->{ connected } );
+    if ( $data !~ '/' && ( ! $server || ! $server->{ connected } ) ) {
+        Irssi::signal_continue( $data, $server, $witem );
+        err( ENOSRV ) and return;
+    }
 
     my ( $code, $out ) = replace( $data );
+    Irssi::print($code);
+    Irssi::print($out);
 
     if( $code ) {
         # Error somewhere.
@@ -188,16 +202,53 @@ sub cmd_lsvar {
     }
 }
 
+### UTILITY SUBS ###
 sub replace {
 
     my $in = shift;
+    my $out = $in; # Just in case.
 
     err( ENOIN   ) if not $in;
     err( ENOVARS ) if not %vars;
 
+    # First check there's even any point.
+    if( $in !~ /(\\*)($plainvar|$pluginvar)/ ) {
+        return ( 0, $out );
+    }
+
+    while( $in =~ /(\\*?)($plainvar|$pluginvar)/g ) {
+        Irssi::print("found a match.");
+        Irssi::print($1) if $1;
+        my ( $flag, $prefix, $name );
+        if( $4 ) {
+            $flag = 'plugin';
+            $prefix = $3;
+            $name = $4;
+            Irssi::print($name);
+        }
+        else {
+            $flag = 'plain';
+            $name = $3;
+            Irssi::print($name);
+        }
+
+        # Check slashes for escapisms.
+        my $count = 0;
+           $count = length( $1 ) if defined $1;
+
+        if( $count % 2 ) {
+            # Odd number of slashes, so this one is escaped.
+            Irssi::print("ESCAPED");
+            next;
+        }
+        else {
+            $out =~ s/$2/REPLACED/;
+        }
+    }
+    Irssi::print("broke out of loop");
+    return (0, $out); 
 }
 
-### UTILITY SUBS ###
 sub cmd_undo {
 
 }
@@ -219,8 +270,8 @@ sub err {
     my $code = shift;
 
     Irssi::print( '[varspl] Error: ' . $code . ' - "' . $err{ $code }{ 'text' } . '"', MSGLEVEL_CLIENTCRAP );
-    return $code if( $err{ $code }{ 'fatal' } );
 
+    return $code if( $err{ $code }{ 'fatal' } );    
 }
 
 sub save_vars {
