@@ -228,7 +228,6 @@ sub replace {
             $flag = 'plain';
             $prefix = '';
             $name = $3;
-            Irssi::print($name);
         }
 
         my $slashes  = '';
