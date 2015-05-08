@@ -4,6 +4,9 @@ use warnings;
 use Irssi;
 use Irssi::TextUI;
 
+use Class::Inspector;
+use Class::Unload;
+
 use File::Copy;
 use File::Path;
 use Storable;
@@ -29,7 +32,7 @@ Irssi::signal_add( 'send command', 'signal_proc' );
 Irssi::signal_add_first( 'complete word', 'tab_complete' );
 
 ### SCRIPT SETUP ###
-our( %cfg, %vars, %err, @varcmds, @tabcmds, @undo, @redo );
+our( %cfg, %vars, %err, %plugins, @varcmds, @tabcmds, @undo, @redo );
 
 our $plainvar  = qr/\{\{(\w+)\}\}/;
 our $pluginvar = qr/\{([^{}|]*?)\{(.+?)\}\}/; # {, } and | are reserved for script functionality.
@@ -41,9 +44,12 @@ my $user = getpwuid( $< );
 
 %cfg = (
     NAME  => 'varspl',
-    VPATH => '/home/' . $user . '/.irssi/',
+    VPATH => '/home/' . $user . '/.irssi/scripts/.varspl/',
     USER  => $user,
+    SELF  => 'Irssi::Script::vars'
 );
+
+mkdir $cfg{ VPATH } unless -e $cfg{ VPATH };
 
 # Error constants.
 use constant {
@@ -87,6 +93,10 @@ use constant {
     }
 );
 
+%plugins = (
+    'loaded' => [],
+);
+
 @varcmds = ( 'mkvar', 'rmvar', 'lsvar', 'undo', 'redo', 'edvar', 'cpvar' );
 @tabcmds = ( 'mkvar', 'rmvar', 'edvar', 'cpvar' );
 our $tabrgx = join( '|', @tabcmds );
@@ -106,6 +116,8 @@ my $file  = $cfg{VPATH} . $fname;
 if( -e $file ) {
     %vars = %{ retrieve( $file ) };
 }
+
+load_plugin( 'Reverse' );
 
 ### SIGNAL PROCESSING ###
 sub signal_proc {
@@ -316,6 +328,49 @@ sub pluginHandler {
     my ( $text, $prefix ) = @_;
 
     return scalar reverse $text;
+
+}
+
+sub load_plugin {
+    my ( $name ) = @_;
+
+    my $pluginclass = "Plugins::$name";
+    my $requirement = $cfg{ VPATH } . "Plugins/$name.pm";
+
+    if( ! valid_plugin( $requirement ) ) {
+        return;
+    }
+
+    if( Class::Inspector->loaded( $pluginclass ) ) {
+    #    Class::Unload->unload( $pluginclass );
+    }
+    require $requirement;
+    use Cwd;
+    Irssi::print( getcwd() );
+
+    my $plugin = new $pluginclass;
+
+    # Register plugin prefix.
+
+    $plugins{ $name } = {
+        class   => $plugin,
+        plugpkg => $plugin->{ classpack },
+        version => $plugin->{ version },
+        info    => $plugin->{ info },
+        prefix  => $plugin->{ prefix },
+    };
+
+    push @{ $plugins{ loaded } }, $name;
+    Irssi::print( $name . ": " . $plugins{ $name }{ plugpkg } );
+
+
+}
+
+sub valid_plugin {
+    return 1;
+}
+
+sub unload_plugin {
 
 }
 
