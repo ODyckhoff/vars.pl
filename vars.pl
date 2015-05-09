@@ -140,7 +140,8 @@ sub signal_proc {
 
     if ( $data !~ '/' && ( ! $server || ! $server->{ connected } ) ) {
         Irssi::signal_continue( $data, $server, $witem );
-        err( ENOSRV ) and return;
+        err( ENOSRV );
+        return;
     }
 
     my ( $code, $out ) = replace( $data );
@@ -311,7 +312,7 @@ sub err {
 
     Irssi::print( '[varspl] Error: ' . $code . ' - "' . $text . '"', MSGLEVEL_CLIENTCRAP );
 
-    Irssi::signal_stop() if( $err{ $code }{ 'fatal' } );
+    Irssi::signal_stop() if( $err{ $code }{ 'fatal' } && $code != ENOSRV );
 }
 
 sub save_vars {
@@ -386,7 +387,7 @@ sub unload_plugin {
     my $class = 'Plugins::' . $name;
 
     foreach my $key ( sort keys %INC ) {
-        delete $INC{ $key } if $key =~ /\.$name\.pm$/;
+        delete $INC{ $key } if $key =~ /Plugins\/$name/;
     }
     Class::Unload->unload( $class );
 
