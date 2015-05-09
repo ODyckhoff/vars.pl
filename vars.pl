@@ -6,6 +6,10 @@ use Irssi::TextUI;
 
 use Class::Inspector;
 use Class::Unload;
+use Module::Load;
+use Module::Reload::Selective;
+
+use List::Util qw(first);
 
 use File::Copy;
 use File::Path;
@@ -50,6 +54,8 @@ my $user = getpwuid( $< );
 );
 
 mkdir $cfg{ VPATH } unless -e $cfg{ VPATH };
+
+push @INC, $cfg{ VPATH };
 
 # Error constants.
 use constant {
@@ -97,7 +103,7 @@ use constant {
     'loaded' => [],
 );
 
-@varcmds = ( 'mkvar', 'rmvar', 'lsvar', 'undo', 'redo', 'edvar', 'cpvar' );
+@varcmds = ( 'script', 'mkvar', 'rmvar', 'lsvar', 'undo', 'redo', 'edvar', 'cpvar' );
 @tabcmds = ( 'mkvar', 'rmvar', 'edvar', 'cpvar' );
 our $tabrgx = join( '|', @tabcmds );
 
@@ -127,7 +133,7 @@ sub signal_proc {
     err( ENOIN   ) and return if not defined $data;
 
     # Don't operate on this script's commands.
-    if( $data =~ /^\/((\w+var)|(un|re)do)(.*)$/ ) {
+    if( $data =~ /^\/((\w+var)|(un|re)do|script)(.*)$/ ) {
         my @matches = grep( /$1/, @varcmds );
         return if @matches;
     }
@@ -326,9 +332,16 @@ sub cmd_redo {
 sub pluginHandler {
 
     my ( $text, $prefix ) = @_;
+    my $out = $text;
 
-    return scalar reverse $text;
+    foreach my $plugin ( sort keys %plugins ) {
+        next if $plugin eq 'loaded';
 
+        if( $plugins{ $plugin }{ prefix } eq $prefix ) {
+            $out = $plugins{ $plugin }{ class }->do_convert( $text );
+        }
+    }
+    return $out;
 }
 
 sub load_plugin {
@@ -342,16 +355,18 @@ sub load_plugin {
     }
 
     if( Class::Inspector->loaded( $pluginclass ) ) {
-    #    Class::Unload->unload( $pluginclass );
+        foreach my $key ( sort keys %INC ) {
+            delete $INC{ $key } if ( $key =~ /Plugins\/$name/ );
+        }
+        Class::Unload->unload( $pluginclass );
+        #&Module::Reload::Selective::reload( $pluginclass );
     }
-    require $requirement;
-    use Cwd;
-    Irssi::print( getcwd() );
+    
+    load $requirement;
 
     my $plugin = new $pluginclass;
 
-    # Register plugin prefix.
-
+    # Register plugin.
     $plugins{ $name } = {
         class   => $plugin,
         plugpkg => $plugin->{ classpack },
@@ -362,16 +377,39 @@ sub load_plugin {
 
     push @{ $plugins{ loaded } }, $name;
     Irssi::print( $name . ": " . $plugins{ $name }{ plugpkg } );
-
-
-}
-
-sub valid_plugin {
-    return 1;
 }
 
 sub unload_plugin {
 
+    my ( $name ) = @_;
+
+    my $class = 'Plugins::' . $name;
+
+    foreach my $key ( sort keys %INC ) {
+        delete $INC{ $key } if $key =~ /\.$name\.pm$/;
+    }
+    Class::Unload->unload( $class );
+
+    return if not $plugins{ $name };
+    delete $plugins{ $name };
+
+    my $index = first { $plugins{ 'loaded' }[$_] eq $name } 0..scalar( $plugins{ 'loaded' } );
+    delete $plugins{ 'loaded' }[ $index ];
+}
+
+sub valid_plugin {
+    my ( $plugin ) = @_;
+
+    if( ! -e $plugin ) {
+        # No such plugin.
+        return 0;
+    }
+
+    if( ( my $res = `perl -c $plugin 2>&1` ) !~ /syntax OK/ ) {
+        # Code error.
+        return 0;
+    }
+    return 1;
 }
 
 ### HELP SUBS ###
