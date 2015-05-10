@@ -31,6 +31,8 @@ Irssi::command_bind( 'help' , 'cmd_help'  );
 Irssi::command_bind( 'lsvar', 'cmd_lsvar' );
 Irssi::command_bind( 'undo' , 'cmd_undo'  );
 Irssi::command_bind( 'redo' , 'cmd_redo'  );
+Irssi::command_bind( 'pload' ,'load_plugin'  );
+Irssi::command_bind( 'punload' ,'unload_plugin'  );
 
 Irssi::signal_add( 'send command', 'signal_proc' );
 Irssi::signal_add_first( 'complete word', 'tab_complete' );
@@ -115,6 +117,7 @@ my $startup = Irssi::settings_get_str( $cfg{NAME} . '_setup' );
 if( ! $startup ) {
     # First time this script has been loaded.
     Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_varfile', '.vardata' );
+    Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_autoplugins', '' );
 }
 
 my $fname = Irssi::settings_get_str( $cfg{NAME} . '_varfile' );
@@ -123,7 +126,10 @@ if( -e $file ) {
     %vars = %{ retrieve( $file ) };
 }
 
-load_plugin( 'Reverse' );
+my @autoplugins = split( /[, ]/, Irssi::settings_get_str( $cfg{NAME} . '_autoplugins' ) );
+foreach my $auto ( @autoplugins ) {
+    load_plugin( $auto );
+}
 
 ### SIGNAL PROCESSING ###
 sub signal_proc {
@@ -356,6 +362,7 @@ sub load_plugin {
     }
 
     if( Class::Inspector->loaded( $pluginclass ) ) {
+        Irssi::print('reloading');
         foreach my $key ( sort keys %INC ) {
             delete $INC{ $key } if ( $key =~ /Plugins\/$name/ );
         }
