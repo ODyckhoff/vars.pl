@@ -23,16 +23,8 @@ our %IRSSI = (
     description => 'A more powerful variables interface for Irssi.'
 );
 
-Irssi::command_bind( 'mkvar', 'cmd_mkvar' );
-Irssi::command_bind( 'rmvar', 'cmd_rmvar' );
-Irssi::command_bind( 'edvar', 'cmd_edvar' );
-Irssi::command_bind( 'cpvar', 'cmd_cpvar' );
+Irssi::command_bind( 'vars',  'cmd_vars'  );
 Irssi::command_bind( 'help' , 'cmd_help'  );
-Irssi::command_bind( 'lsvar', 'cmd_lsvar' );
-Irssi::command_bind( 'undo' , 'cmd_undo'  );
-Irssi::command_bind( 'redo' , 'cmd_redo'  );
-Irssi::command_bind( 'pload' ,'load_plugin'  );
-Irssi::command_bind( 'punload' ,'unload_plugin'  );
 
 Irssi::signal_add( 'send command', 'signal_proc' );
 Irssi::signal_add_first( 'complete word', 'tab_complete' );
@@ -61,12 +53,13 @@ push @INC, $cfg{ VPATH };
 
 # Error constants.
 use constant {
-    ENOACT  => 0,
-    ENOVARS => 1,
-    ENOIN   => 2,
-    ENOSRV  => 3,
-    ELOOP   => 4,
-    ENOKEY  => 5,
+    ENOACT    => 0,
+    ENOVARS   => 1,
+    ENOIN     => 2,
+    ENOSRV    => 3,
+    ELOOP     => 4,
+    ENOKEY    => 5,
+    ENOPREFIX => 6,
 };
 
 %err = (
@@ -98,6 +91,11 @@ use constant {
     5 => {
         fatal => 1,
         text  => "No such variable '%s'"
+    },
+
+    6 => {
+        fatal => 1,
+        text  => "No plugin exists with that prefix",
     }
 );
 
@@ -139,10 +137,13 @@ sub signal_proc {
     err( ENOIN   ) and return if not defined $data;
 
     # Don't operate on this script's commands.
-    if( $data =~ /^\/((\w+var)|(un|re)do|script)(.*)$/ ) {
+    if( $data =~ /^((\w+var)|(un|re)do|script)(.*)$/ ) {
         my @matches = grep( /$1/, @varcmds );
         return if @matches;
     }
+
+    # Don't operate on commands that start with /^
+    return if $data =~ /^\/\^/;
 
     if ( $data !~ '/' && ( ! $server || ! $server->{ connected } ) ) {
         Irssi::signal_continue( $data, $server, $witem );
@@ -151,9 +152,8 @@ sub signal_proc {
     }
 
     my ( $code, $out ) = replace( $data );
-    Irssi::print($out);
 
-    if( ! $code ) {
+    if( ! $code && $out ) {
         Irssi::signal_continue( $out, $server, $witem );
     }
 
@@ -165,6 +165,54 @@ sub tab_complete {
 }
 
 ### INTERNAL SUBS ###
+sub cmd_vars {
+
+    my @args = split( /\s/, $_[0] );
+    my $cmd = shift @args;
+
+    # Parse command.
+    # Plugin commands.
+    if( $cmd =~ /^load/i ) {
+        load_plugin( $args[0] );
+    }
+    if( $cmd =~ /unload/i ) {
+        unload_plugin( $args[0] );
+    }
+    if( $cmd =~ /autoload/i ) {
+        if( $args[0] =~ /^add$/i ) {
+            autoload_add( $args[1] );
+        }
+        elsif( $args[0] =~ /^(rm|remove)$/i ) {
+            autoload_rm( $args[1] );
+        }
+    }
+
+    # Script commands.
+    if( $cmd =~ /^mk$/i ) {
+        cmd_mkvar( @args );
+    }
+    if( $cmd =~ /^rm$/i ) {
+        cmd_rmvar( @args );
+    }
+    if( $cmd =~ /^ed$/i ) {
+        cmd_edvar( @args );
+    }
+    if( $cmd =~ /^cp$/i ) {
+        cmd_cpvar( @args );
+    }
+    if( $cmd =~ /^ls$/i ) {
+        cmd_lsvar( @args );
+    }
+
+    # Utility commands.
+    if( $cmd =~ /^undo$/i ) {
+        cmd_undo( @args );
+    }
+    if( $cmd =~ /^redo$/i ) {
+        cmd_redo( @args );
+    }
+}
+
 sub cmd_mkvar {
 
 }
@@ -213,9 +261,14 @@ sub cmd_lsvar {
                               ''
                           ), MSGLEVEL_CLIENTCRAP
                      )
-        if( $value  =~ qr/$arg/ 
-           || $key  =~ qr/$arg/
-           || $full =~ qr/$arg/
+        if( ! $arg 
+         || ( $arg 
+              &&
+                ( $value =~ qr/$arg/ 
+               || $key   =~ qr/$arg/
+               || $full  =~ qr/$arg/
+                )
+            )
         );
     }
 }
@@ -265,6 +318,7 @@ sub replace {
 
             my $replaced = '';
             $replaced = extrapolate( $name, $prefix );
+            return if ! $replaced;
             
             $varmatch =~ s/([\\\[\]\(\)\{\}\.\^\$\*\+\?])/\\$1/g;
             $out =~ s/(?<!\\)$varmatch/$replaced/;
@@ -339,7 +393,7 @@ sub cmd_redo {
 sub pluginHandler {
 
     my ( $text, $prefix ) = @_;
-    my $out = $text;
+    my $out;
 
     foreach my $plugin ( sort keys %plugins ) {
         next if $plugin eq 'loaded';
@@ -347,6 +401,10 @@ sub pluginHandler {
         if( $plugins{ $plugin }{ prefix } eq $prefix ) {
             $out = $plugins{ $plugin }{ class }->do_convert( $text );
         }
+    }
+
+    if( ! $out ) {
+        err( ENOPREFIX ) && return;
     }
     return $out;
 }
@@ -418,6 +476,24 @@ sub valid_plugin {
         return 0;
     }
     return 1;
+}
+
+sub autoload_add {
+    my ( $plugin ) = @_;
+
+    my $list  = Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' );
+       $list .= " " . $plugin;
+
+    Irssi::settings_set_str( $cfg{ NAME } . '_autoplugins', $list );
+}
+
+sub autoload_rm {
+    my ( $plugin ) = @_;
+
+    my $list = Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' );
+       $list =~ s/$plugin\s?//;
+
+    Irssi::settings_set_str( $cfg{ NAME } . '_autoplugins', $list );
 }
 
 ### HELP SUBS ###
