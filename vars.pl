@@ -62,6 +62,7 @@ use constant {
     ENOPREFIX => 6,
     ENOPLUG   => 7,
     EBADPLUG  => 8,
+    EEXISTS   => 9,
 };
 
 %err = (
@@ -100,7 +101,11 @@ use constant {
     8 => { # EBADPLUG
         fatal => 1,
         text  => "Error in plugin. %s"
-    }  
+    },
+    9 => { #EEXISTS
+        fatal => 1,
+        text  => "Variable '%s' already exists."
+    },
 );
 
 %plugins = (
@@ -218,11 +223,30 @@ sub cmd_vars {
 }
 
 sub cmd_mkvar {
+    my $name  = shift;
+    my $value = join( " ", @_ );
 
+    if( defined $vars{ $name } ) {
+        err( EEXISTS, $name );
+        return;
+    }
+    
+    if( chk_loop( $value, $name ) ) {
+        $vars{ $name } = $value;
+        save_vars;
+    }
 }
 
 sub cmd_rmvar {
+    my $name = shift;
 
+    if( defined $vars{ $name } ) {
+        delete $vars{ $name };
+        save_vars;
+    }
+    else {
+        err( ENOKEY, $name );
+    }
 }
 
 sub cmd_edvar {
@@ -357,11 +381,26 @@ sub extrapolate {
 }
 
 sub chk_loop {
-    my %rtnobj = ();
+    my ( $varvalue, $vartocheck ) = @_;
 
-    $rtnobj{ 'text' } = "testing";
+    my $tmp = $varvalue;
 
-    return \%rtnobj;
+    while( $tmp =~ /$pluginvar/ ) {
+        my $newname = $2;
+
+        if( $newname eq $vartocheck ) {
+            err( ELOOP );
+            return 0;
+        }
+        if( defined $vars{ $newname } ) {
+            $tmp =~ s/$pluginvar/$vars{ $newname }/;
+        }
+        else {
+            $tmp =~ s/$pluginvar/$newname/;
+        }
+    }
+
+    return 1;
 }
 
 sub err {
@@ -471,7 +510,7 @@ sub valid_plugin {
     my ( $plugin ) = @_;
 
     if( ! -e $plugin ) {
-        err( ENOPLUG );
+        err( ENOPLUG, $plugin );
         return 0;
     }
 
