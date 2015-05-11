@@ -274,7 +274,7 @@ sub cmd_cpvar {
     my $tot   = scalar( @_ ) - 1;
     my @data  = ();
 
-    for( my $count = 0; $count < scalar( @_ ); $count++ ) {
+    for( my $count = 0; $count < $tot; $count++ ) {
         if( $_[ $count ] =~ /^(-f|--force|-x)$/i ) {
             my $flag = $1;
             $force = 1 if( $flag =~ /-f/ );
@@ -327,9 +327,9 @@ sub cmd_mvvar {
 
     my $force = 0;
     my @data = ();
-    my $tot = scalar( @_ );
+    my $tot = scalar( @_ ) - 1;
 
-    for( my $count = 0; $count < scalar( @_ ); $count++ ) {
+    for( my $count = 0; $count <= $tot; $count++ ) {
         if( $_[ $count ] =~ /^(-f|--force)$/i ) {
             $force = 1;
 
