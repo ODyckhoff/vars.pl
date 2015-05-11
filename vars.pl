@@ -112,7 +112,7 @@ use constant {
     'loaded' => [],
 );
 
-@varcmds = ( 'script', 'mkvar', 'rmvar', 'lsvar', 'undo', 'redo', 'edvar', 'cpvar' );
+@varcmds = ( 'script', 'vars' );
 @tabcmds = ( 'mkvar', 'rmvar', 'edvar', 'cpvar' );
 our $tabrgx = join( '|', @tabcmds );
 
@@ -146,7 +146,7 @@ sub signal_proc {
     err( ENOBUF   ) and return if not defined $data;
 
     # Don't operate on this script's commands.
-    if( $data =~ /^((\w+var)|(un|re)do|script)(.*)$/ ) {
+    if( $data =~ /^\/(vars|script)(.*)$/ ) {
         my @matches = grep( /$1/, @varcmds );
         return if @matches;
     }
@@ -212,6 +212,9 @@ sub cmd_vars {
     if( $cmd =~ /^ls$/i ) {
         cmd_lsvar( @args );
     }
+    if( $cmd =~ /^mv$/i ) {
+        cmd_mvvar( @args );
+    }
 
     # Utility commands.
     if( $cmd =~ /^undo$/i ) {
@@ -233,7 +236,7 @@ sub cmd_mkvar {
     
     if( chk_loop( $value, $name ) ) {
         $vars{ $name } = $value;
-        save_vars;
+        &save_vars;
     }
 }
 
@@ -242,7 +245,7 @@ sub cmd_rmvar {
 
     if( defined $vars{ $name } ) {
         delete $vars{ $name };
-        save_vars;
+        &save_vars;
     }
     else {
         err( ENOKEY, $name );
@@ -250,11 +253,123 @@ sub cmd_rmvar {
 }
 
 sub cmd_edvar {
+    my $name  = shift;
+    my $value = join( " ", @_ );
 
+    if( ! defined $vars{ $name } ) {
+        err( ENOKEY, $name );
+        return;
+    }
+    
+    if( chk_loop( $value, $name ) ) {
+        $vars{ $name } = $value;
+        &save_vars;
+    }
 }
 
 sub cmd_cpvar {
 
+    my $force = 0;
+    my $full  = 0;
+    my $tot   = scalar( @_ ) - 1;
+    my @data  = ();
+
+    for( my $count = 0; $count < scalar( @_ ); $count++ ) {
+        if( $_[ $count ] =~ /^(-f|--force|-x)$/i ) {
+            my $flag = $1;
+            $force = 1 if( $flag =~ /-f/ );
+            $full  = 1 if( $flag =~ /-x/ );
+
+            if( $count == 0 ) {
+                # Everything but the first element.
+                shift;
+                @data = @_;
+            }
+            elsif( $count == $tot ) {
+                # Everything but the last element.
+                pop;
+                @data = @_;
+            }
+            else {
+                @data = ( 
+                    @_[   0..( $count - 1 )  ], 
+                    @_[ ( $count + 1 )..$tot ]
+                );
+            }
+        }
+    }
+
+    my $cur = shift;
+    my $new = shift;
+
+    if( ! defined $vars{ $cur } ) {
+        err( ENOKEY, $cur );
+        return;
+    }
+
+    if( defined $vars{ $new } && ! $force ) {
+        err( EEXISTS, $new );
+        return;
+    }
+
+    if( $vars{ $cir } && chk_loop( $vars{ $cur } $new ) ) {
+        if( $full ) {
+            $vars{ $new } = replace( $vars{ $cur } );
+        }
+        else {
+            $vars{ $new } = $vars{ $cur };
+        }
+        &save_vars;
+    }
+}
+
+sub cmd_mvvar {
+
+    my $force = 0;
+    my @data = ();
+    my $tot = scalar( @_ );
+
+    for( my $count = 0; $count < scalar( @_ ); $count++ ) {
+        if( $_[ $count ] =~ /^(-f|--force)$/i ) {
+            $force = 1;
+
+            if( $count == 0 ) {
+                # Everything but the first element.
+                shift;
+                @data = @_;
+            }
+            elsif( $count == $tot ) {
+                # Everything but the last element.
+                pop;
+                @data = @_;
+            }
+            else {
+                @data = ( 
+                    @_[   0..( $count - 1 )  ], 
+                    @_[ ( $count + 1 )..$tot ]
+                );
+            }
+        }
+    }
+
+    my $cur = shift @data;
+    my $new = shift @data;
+
+    if( ! defined $vars{ $cur } ) {
+        err( ENOKEY, $cur );
+        return;
+    }
+
+    if( defined $vars{ $new } && ! $force ) {
+        err( EEXISTS, $new );
+        return;
+    }
+
+    if( $vars{ $cur } && chk_loop( $vars{ $cur }, $new ) ) {
+        $vars{ $new } = $vars{ $cur };
+        delete $vars{ $cur };
+        &save_vars;
+    }
 }
 
 sub cmd_lsvar {
