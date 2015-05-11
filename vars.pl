@@ -113,9 +113,6 @@ use constant {
 );
 
 @varcmds = ( 'script', 'vars' );
-@tabcmds = ( 'mkvar', 'rmvar', 'edvar', 'cpvar' );
-our $tabrgx = join( '|', @tabcmds );
-
 
 ### STARTUP CONTROL ###
 Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_setup', 'true' );
@@ -214,14 +211,6 @@ sub cmd_vars {
     }
     if( $cmd =~ /^mv$/i ) {
         cmd_mvvar( @args );
-    }
-
-    # Utility commands.
-    if( $cmd =~ /^undo$/i ) {
-        cmd_undo( @args );
-    }
-    if( $cmd =~ /^redo$/i ) {
-        cmd_redo( @args );
     }
 }
 
@@ -536,14 +525,6 @@ sub err {
 sub save_vars {
     my $file = $cfg{ VPATH } . Irssi::settings_get_str( $cfg{ NAME } . '_varfile' );
     store( \%vars, $file ) if -e $file;
-}
-
-sub cmd_undo {
-
-}
-
-sub cmd_redo {
-
 }
 
 ### PLUGIN SUBS ###
