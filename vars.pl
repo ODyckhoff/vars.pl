@@ -301,7 +301,7 @@ sub cmd_cpvar {
         return;
     }
 
-    if( $vars{ $cur } && chk_loop( $vars{ $cur } $new ) ) {
+    if( $vars{ $cur } && chk_loop( $vars{ $cur }, $new ) ) {
         if( $full ) {
             $vars{ $new } = replace( $vars{ $cur } );
         }
