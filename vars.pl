@@ -16,7 +16,7 @@ use File::Path;
 use Storable;
 
 ### IRSSI INTERNALS SETUP ###
-our $VERSION = '2.0';
+our $VERSION = '2.0.1';
 our %IRSSI = (
     author      => 'Owen Rodger Dyckhoff',
     name        => 'vars.pl',
@@ -559,7 +559,6 @@ sub load_plugin {
     }
 
     if( Class::Inspector->loaded( $pluginclass ) ) {
-        Irssi::print('reloading');
         foreach my $key ( sort keys %INC ) {
             delete $INC{ $key } if ( $key =~ /Plugins\/$name/ );
         }
@@ -581,7 +580,7 @@ sub load_plugin {
     };
 
     push @{ $plugins{ loaded } }, $name;
-    Irssi::print( $name . ": " . $plugins{ $name }{ plugpkg } );
+    Irssi::print( "Loaded plugin: $name" );
 }
 
 sub unload_plugin {
