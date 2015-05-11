@@ -16,7 +16,7 @@ use File::Path;
 use Storable;
 
 ### IRSSI INTERNALS SETUP ###
-our $VERSION = '2.0-alpha';
+our $VERSION = '2.0';
 our %IRSSI = (
     author      => 'Owen Rodger Dyckhoff',
     name        => 'vars.pl',
