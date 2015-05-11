@@ -55,48 +55,52 @@ push @INC, $cfg{ VPATH };
 use constant {
     ENOACT    => 0,
     ENOVARS   => 1,
-    ENOIN     => 2,
+    ENOBUF    => 2,
     ENOSRV    => 3,
     ELOOP     => 4,
     ENOKEY    => 5,
     ENOPREFIX => 6,
+    ENOPLUG   => 7,
+    EBADPLUG  => 8,
 };
 
 %err = (
-    0 => {
+    0 => { # ENOACT
         fatal => 0,
         text  => "No errors or nothing to do."
     },
-
-    1 => { 
+    1 => { # ENOVARS
         fatal => 1,
         text  => "No variables in vars datastructure."
     },
-
-    2 => {
+    2 => { # ENOBUF
         fatal => 1,
         text  => "Empty input."
     },
-
-    3 => {
+    3 => { # ENOSRV
         fatal => 1,
         text  => "Not connected to server."
     },
-
-    4 => { 
+    4 => { # ELOOP
         fatal => 1,
         text  => "Loop detected in variable."
     },
-
-    5 => {
+    5 => { # ENOKEY
         fatal => 1,
         text  => "No such variable '%s'"
     },
-
-    6 => {
+    6 => { # ENOPREFIX
         fatal => 1,
-        text  => "No plugin exists with that prefix",
-    }
+        text  => "No plugin exists with prefix: %s"
+    },
+    7 => { # ENOPLUG
+        fatal => 1,
+        text  => "No such plugin %s"
+    },
+    8 => { # EBADPLUG
+        fatal => 1,
+        text  => "Error in plugin. %s"
+    }  
 );
 
 %plugins = (
@@ -134,7 +138,7 @@ sub signal_proc {
     my ( $data, $server, $witem ) = @_;
 
     err( ENOVARS ) and return if not defined %vars;
-    err( ENOIN   ) and return if not defined $data;
+    err( ENOBUF   ) and return if not defined $data;
 
     # Don't operate on this script's commands.
     if( $data =~ /^((\w+var)|(un|re)do|script)(.*)$/ ) {
@@ -279,7 +283,7 @@ sub replace {
     my $in = shift;
     my $out = $in; # Just in case.
 
-    err( ENOIN   ) if not $in;
+    err( ENOBUF   ) if not $in;
     err( ENOVARS ) if not %vars;
 
     # First check there's even any point.
@@ -467,12 +471,12 @@ sub valid_plugin {
     my ( $plugin ) = @_;
 
     if( ! -e $plugin ) {
-        # No such plugin.
+        err( ENOPLUG );
         return 0;
     }
 
     if( ( my $res = `perl -c $plugin 2>&1` ) !~ /syntax OK/ ) {
-        # Code error.
+        err( EBADPLUG );
         return 0;
     }
     return 1;
