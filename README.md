@@ -3,7 +3,7 @@ A more powerful variables interface for Irssi.
 
 Introduction
 ============
-vars.pl was written to be able to insert arguments into arbitrary locations within the input, replacing aliases and the elaborate rules required to interpret any number of arguments in arbitrary locations.
+vars.pl was written to be able to insert any number of arguments into arbitrary locations within the input, replacing aliases and the elaborate rules required to achieve the same.
 
 Full documentation can be found in the wiki. If the script is loaded and working, `/help vars` will print help.
 
