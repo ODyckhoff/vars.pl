@@ -132,7 +132,7 @@ if( -e $file ) {
 
 my @autoplugins = split( /[, ]/, Irssi::settings_get_str( $cfg{NAME} . '_autoplugins' ) );
 foreach my $auto ( @autoplugins ) {
-    load_plugin( $auto );
+    load_plugin( $auto ) if $auto;
 }
 
 ### SIGNAL PROCESSING ###
@@ -167,7 +167,43 @@ sub signal_proc {
 }
 
 sub tab_complete {
+    my ( $strings, $window, $arg, $linestart, $want_space ) = @_;
+    if( $linestart =~ /^\/vars$/i ) {
+        # Completing sub-commands.
+        @$strings = (
+            'mk', 'rm', 'ed', 'cp', 'ls', 'mv', 'load', 'unload', 'autoload'
+        );
+        $$want_space = 1;
 
+        Irssi::signal_stop;
+    }
+    elsif( $linestart =~ /^\/vars autoload$/i ) {
+        @$strings = ( 'add', 'rm' );
+        $$want_space = 1;
+        Irssi::signal_stop;
+    }
+    elsif( $linestart =~ /^\/vars autoload (rm|remove)$/i ) {
+        @$strings = split( /\s/, Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' ) );
+        $$want_space = 0;
+        Irssi::signal_stop;
+    }
+    elsif( $linestart =~ /^\/vars autoload add$/i || $linestart =~ /^\/vars load$/i ) {
+        opendir( my $dh, $cfg{ VPATH } . '/Plugins/' );
+        foreach( grep { /^[^\.]/ && -f $cfg{ VPATH } . '/Plugins/' . $_ } readdir( $dh ) ) {
+            s/\.pm$//;
+            push @$strings, $_;
+        }
+        $$want_space = 0;
+        Irssi::signal_stop;
+    }
+    elsif( $linestart =~ /^\/vars unload$/i ) {
+	@$strings = @{ $plugins{ loaded } };
+        $$want_space = 0;
+        Irssi::signal_stop;
+    }
+    else {
+        return;
+    }
 }
 
 ### INTERNAL SUBS ###
@@ -620,7 +656,7 @@ sub autoload_add {
     my ( $plugin ) = @_;
 
     my $list  = Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' );
-       $list .= " " . $plugin;
+       $list .= $plugin . " ";
 
     Irssi::settings_set_str( $cfg{ NAME } . '_autoplugins', $list );
 }
@@ -629,7 +665,7 @@ sub autoload_rm {
     my ( $plugin ) = @_;
 
     my $list = Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' );
-       $list =~ s/$plugin\s?//;
+       $list =~ s/$plugin\s//;
 
     Irssi::settings_set_str( $cfg{ NAME } . '_autoplugins', $list );
 }
