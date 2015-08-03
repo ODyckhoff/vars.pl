@@ -16,7 +16,7 @@ use File::Path;
 use Storable;
 
 ### IRSSI INTERNALS SETUP ###
-our $VERSION = '2.0.1';
+our $VERSION = '2.0.2';
 our %IRSSI = (
     author      => 'Owen Rodger Dyckhoff',
     name        => 'vars.pl',
@@ -118,7 +118,7 @@ use constant {
 Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_setup', 'true' );
 my $startup = Irssi::settings_get_str( $cfg{NAME} . '_setup' );
 
-if( ! $startup ) {
+if( $startup ) {
     # First time this script has been loaded.
     Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_varfile', '.vardata' );
     Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_autoplugins', '' );
@@ -130,7 +130,7 @@ if( -e $file ) {
     %vars = %{ retrieve( $file ) };
 }
 
-my @autoplugins = split( /[, ]/, Irssi::settings_get_str( $cfg{NAME} . '_autoplugins' ) );
+my @autoplugins = split( /[, ]{1,2}/, Irssi::settings_get_str( $cfg{NAME} . '_autoplugins' ) );
 foreach my $auto ( @autoplugins ) {
     load_plugin( $auto ) if $auto;
 }
@@ -139,8 +139,8 @@ foreach my $auto ( @autoplugins ) {
 sub signal_proc {
     my ( $data, $server, $witem ) = @_;
 
-    err( ENOVARS ) and return if not defined %vars;
-    err( ENOBUF   ) and return if not defined $data;
+    err( ENOVARS ) and return if not %vars;
+                       return if not $data;
 
     # Don't operate on this script's commands.
     if( $data =~ /^\/(vars|script)(.*)$/ ) {
@@ -168,22 +168,23 @@ sub signal_proc {
 
 sub tab_complete {
     my ( $strings, $window, $arg, $linestart, $want_space ) = @_;
+    #Irssi::print( "$linestart, $arg" );
     if( $linestart =~ /^\/vars$/i ) {
         # Completing sub-commands.
-        @$strings = (
-            'mk', 'rm', 'ed', 'cp', 'ls', 'mv', 'load', 'unload', 'autoload'
+        @$strings = grep( /^$arg/,
+            [ 'mk', 'rm', 'ed', 'cp', 'ls', 'mv', 'load', 'unload', 'autoload' ]
         );
         $$want_space = 1;
 
         Irssi::signal_stop;
     }
     elsif( $linestart =~ /^\/vars autoload$/i ) {
-        @$strings = ( 'add', 'rm' );
+        @$strings = grep( /^$arg/, [ 'add', 'rm' ] );
         $$want_space = 1;
         Irssi::signal_stop;
     }
     elsif( $linestart =~ /^\/vars autoload (rm|remove)$/i ) {
-        @$strings = split( /\s/, Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' ) );
+        @$strings = grep( /^$arg/, split( /\s/, Irssi::settings_get_str( $cfg{ NAME } . '_autoplugins' ) ) );
         $$want_space = 0;
         Irssi::signal_stop;
     }
@@ -191,13 +192,13 @@ sub tab_complete {
         opendir( my $dh, $cfg{ VPATH } . '/Plugins/' );
         foreach( grep { /^[^\.]/ && -f $cfg{ VPATH } . '/Plugins/' . $_ } readdir( $dh ) ) {
             s/\.pm$//;
-            push @$strings, $_;
+            push @$strings, $_ if /^$arg/;
         }
         $$want_space = 0;
         Irssi::signal_stop;
     }
     elsif( $linestart =~ /^\/vars unload$/i ) {
-	@$strings = @{ $plugins{ loaded } };
+	@$strings = grep( /^$arg/, @{ $plugins{ loaded } } );
         $$want_space = 0;
         Irssi::signal_stop;
     }
@@ -447,7 +448,7 @@ sub replace {
     my $in = shift;
     my $out = $in; # Just in case.
 
-    err( ENOBUF   ) if not $in;
+    err( ENOBUF  ) if not $in;
     err( ENOVARS ) if not %vars;
 
     # First check there's even any point.
@@ -641,14 +642,46 @@ sub valid_plugin {
     my ( $plugin ) = @_;
 
     if( ! -e $plugin ) {
+        # It doesn't exist. Invalid.
         err( ENOPLUG, $plugin );
         return 0;
     }
 
     if( ( my $res = `perl -c $plugin 2>&1` ) !~ /syntax OK/ ) {
-        err( EBADPLUG );
+        # The code is bad and the developer should feel bad. Invalid.
+        err( EBADPLUG, $plugin );
         return 0;
     }
+
+    # Check for subroutines and required variables.
+    my ( $ver, $inf, $con, $strict, $warn, $sub_do, $prefix, $export );
+    open( my $fh, $plugin ) or die "Couldn't open file: $!";
+
+    while( <$fh> ) {
+        $strict = ( /(?<!#)\s*use strict/     ) ? 1 : 0;
+        $warn   = ( /(?<!#)\s*use warnings/   ) ? 1 : 0;
+        $sub_do = ( /(?<!#)\s*sub do_convert/ ) ? 1 : 0;
+        $prefix = ( /(?<!#)\s*our \$PREFIX = '(.)';/ ) ? 1 : 0;
+        $export = ( /(?<!#)\s*our \@EXPORT_OK = qw\( do_convert new \)/ ) ? 0 : 0;
+
+        if( $prefix == 1 ) {
+            foreach my $plgname ( sort keys %plugins ) {
+                next if $plgname eq 'loaded';
+                if( $plugins{ $plgname }{ prefix } eq $1 ) {
+                    $prefix = 0;
+                }
+                else {
+                    $prefix = -1; # Indicate that it's been checked to avoid looping every time.
+                }
+            }
+        }
+    }
+    close $fh;
+    if( grep( 0, [ $strict, $warn, $sub_do, $prefix, $export ] ) ) {
+        err( EBADPLUG, $plugin );
+        return 0;
+    }
+    # Passed all checks.
     return 1;
 }
 
