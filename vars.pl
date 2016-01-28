@@ -15,6 +15,9 @@ use File::Copy;
 use File::Path;
 use Storable;
 
+use Encode;
+use Text::Unidecode;
+
 ### IRSSI INTERNALS SETUP ###
 our $VERSION = '2.0.2';
 our %IRSSI = (
@@ -34,7 +37,7 @@ our( %cfg, %vars, %err, %plugins, @varcmds, @tabcmds, @undo, @redo );
 
 our $plainvar  = qr/\{\{(\w+)\}\}/;
 our $pluginvar = qr/\{([^{}|]*?)\{(.+?)\}\}/; # {, } and | are reserved for script functionality.
-                                                   # \ is just plain not allowed.
+                                              # \ is just plain not allowed.
 # Script configuration and constants.
 my $user = getpwuid( $< );
 
@@ -115,14 +118,10 @@ use constant {
 @varcmds = ( 'script', 'vars' );
 
 ### STARTUP CONTROL ###
-Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_setup', 'true' );
-my $startup = Irssi::settings_get_str( $cfg{NAME} . '_setup' );
+Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_setup', 'false' );
 
-if( $startup ) {
-    # First time this script has been loaded.
-    Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_varfile', '.vardata' );
-    Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_autoplugins', '' );
-}
+Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_varfile', '.vardata' );
+Irssi::settings_add_str( $cfg{NAME}, $cfg{NAME} . '_autoplugins', '' );
 
 my $fname = Irssi::settings_get_str( $cfg{NAME} . '_varfile' );
 my $file  = $cfg{VPATH} . $fname;
@@ -353,33 +352,15 @@ sub cmd_mvvar {
 
     my $force = 0;
     my @data = ();
-    my $tot = scalar( @_ ) - 1;
+    my $tot = scalar( @_ );
 
-    for( my $count = 0; $count <= $tot; $count++ ) {
-        if( $_[ $count ] =~ /^(-f|--force)$/i ) {
-            $force = 1;
-
-            if( $count == 0 ) {
-                # Everything but the first element.
-                shift;
-                @data = @_;
-            }
-            elsif( $count == $tot ) {
-                # Everything but the last element.
-                pop;
-                @data = @_;
-            }
-            else {
-                @data = ( 
-                    @_[   0..( $count - 1 )  ], 
-                    @_[ ( $count + 1 )..$tot ]
-                );
-            }
-        }
+    if( $tot == 3 && $_[0] =~ /-f|--force/ ) {
+        $force = 1;
+        shift;
     }
 
-    my $cur = shift @data;
-    my $new = shift @data;
+    my $cur = shift;
+    my $new = shift;
 
     if( ! defined $vars{ $cur } ) {
         err( ENOKEY, $cur );
@@ -446,7 +427,9 @@ sub cmd_lsvar {
 sub replace {
 
     my $in = shift;
+    #my $out = encode('utf8', $in);
     my $out = $in; # Just in case.
+
 
     err( ENOBUF  ) if not $in;
     err( ENOVARS ) if not %vars;
@@ -457,8 +440,9 @@ sub replace {
     }
 
     # Loop through any possible matches.
-    while( $in =~ /(\\*?)($plainvar|$pluginvar)/g ) {
+    while( $out =~ /(\\*?)($plainvar|$pluginvar)/g ) {
         my ( $flag, $prefix, $name );
+        #Irssi::print("Matched: $&");
         if( $4 ) {
             $flag = 'plugin';
             $prefix = $4;
@@ -474,6 +458,8 @@ sub replace {
            $slashes  = $1 if defined $1;
         my $varmatch = $2;
 
+        #Irssi::print("out = $out, varmatch = $varmatch");
+
         # Check slashes for escapisms.
         my $count = 0;
            $count = length( $slashes );
@@ -485,12 +471,23 @@ sub replace {
         else {
             err( ENOKEY, $name ) && return ( ENOKEY, $out ) if ! $vars{ $name } && $flag eq 'plain';
 
-            my $replaced = '';
-            $replaced = extrapolate( $name, $prefix );
+            my $replaced = extrapolate( $name, $prefix );
+            #$replaced =~ s/([^[:ascii:]]+)/unidecode($1)/ge;
+            #Irssi::print("replaced = $replaced ( $prefix -> $name )");
+
             return if ! $replaced;
             
-            $varmatch =~ s/([\\\[\]\(\)\{\}\.\^\$\*\+\?])/\\$1/g;
-            $out =~ s/(?<!\\)$varmatch/$replaced/;
+            #$varmatch =~ s/([\\\[\]\(\)\{\}\.\^\$\*\+\?\/])/\\$1/g;
+            #Irssi::print("out (before substitution) = $out");
+            my $re = qr/(?<!\\)$varmatch/;
+            #Irssi::print("Compiled regex: $re");
+            $out =~ s/$re/$replaced/;
+            #Irssi::print("out = $out, varmatch = $varmatch");
+
+#            for my $c ( split //, $out ) {
+#                Irssi::print("Character: $c, Code: " . ord($c));
+#            }
+
         }
     }
 
@@ -576,11 +573,12 @@ sub pluginHandler {
 
         if( $plugins{ $plugin }{ prefix } eq $prefix ) {
             $out = $plugins{ $plugin }{ class }->do_convert( $text );
+            #Irssi::print($out);
         }
     }
 
     if( ! $out ) {
-        err( ENOPREFIX ) && return;
+        err( ENOPREFIX, $prefix ) && return;
     }
     return $out;
 }
@@ -636,6 +634,8 @@ sub unload_plugin {
 
     my $index = first { $plugins{ 'loaded' }[$_] eq $name } 0..scalar( $plugins{ 'loaded' } );
     delete $plugins{ 'loaded' }[ $index ];
+
+    Irssi::print( "Unloaded plugin: $name" );
 }
 
 sub valid_plugin {
